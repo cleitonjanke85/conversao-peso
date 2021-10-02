@@ -1,0 +1,33 @@
+# Deployment da Aplicacao
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: peso
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: peso
+  template:
+    metadata:
+      labels:
+        app: peso
+    spec:
+      containers:
+        - name: peso
+          image: cleitonjanke/conversao-peso:v1
+          ports:
+            - containerPort: 80
+---
+# Service da Aplicacao
+apiVersion: v1
+kind: Service
+metadata:
+  name: peso
+spec:
+  selector:
+    app: peso
+  ports:
+    - port: 80
+      nodePort: 30000
+  type: NodePort
