@@ -1,0 +1,71 @@
+# This is the CI/CD workflow for the main branch:
+
+name: CI-CD
+
+# Controls when the workflow will run
+on:
+  # Triggers the workflow on push events on the main branch
+  push:
+    branches: [ main ]
+
+  # Allows you to run this workflow manually from the Actions tab
+  workflow_dispatch:
+
+jobs:
+  # "Continuous Integration" workflow job
+  CI:
+    runs-on: ubuntu-latest
+
+    steps:
+      # Checks-out the repository under $GITHUB_WORKSPACE, so the job can access it
+      - name: Check-out Repository
+        id: checkout_repository
+        uses: actions/checkout@v2
+
+      # Authentication on DockerHub
+      - name: Docker Login
+        id: docker_login
+        uses: docker/login-action@v1.10.0
+        with:
+          username: ${{ secrets.DOCKERHUB_USER }}
+          password: ${{ secrets.DOCKERHUB_PWD }}
+
+      # Build and Push the docker images to DockerHub
+      - name: Docker Build and Push
+        id: docker_build_push
+        uses: docker/build-push-action@v2.7.0
+        with:
+          context: ./
+          file: ./Dockerfile
+          push: true
+          tags: |
+            cleitonjanke/conversao-peso:latest
+            cleitonjanke/conversao-peso:run-${{ github.run_number }}
+
+  # "Continuous Deployment" workflow job
+  CD:
+    needs: [CI]
+    runs-on: ubuntu-latest
+
+    steps:
+      # Checks-out the repository under $GITHUB_WORKSPACE, so the job can access it
+      - name: Check-out Repository
+        id: checkout_repository
+        uses: actions/checkout@v2
+
+      # Set the context of the Kubernetes cluster
+      - name: Kubernetes set context
+        id: k8s_set_context
+        uses: Azure/k8s-set-context@v1.1
+        with:
+          method: kubeconfig
+          kubeconfig: ${{ secrets.K8S_KUBECONFIG }}
+
+      # Deploy the application to the Kubernetes cluster
+      - name: Deploy to Kubernetes cluster
+        id: k8s_deploy
+        uses: Azure/k8s-deploy@v1.3
+        with:
+          images: cleitonjanke/conversao-peso:run-${{ github.run_number }}
+          manifests: |
+            ./k8s/deployment.yaml
